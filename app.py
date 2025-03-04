@@ -15,8 +15,13 @@ from io import BytesIO
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.rl_config import register_reset
 
-# Wyłączamy domyślne czcionki
+# Wyłączamy domyślne czcionki i ustawiamy własne
 register_reset()
+_fontdata.STRIP_CONTROL = False
+_fontdata.EXTENSIONS = []
+_fontdata.DEFAULT_ENCODING = 'utf-8'
+_fontdata.T1SearchPath = []
+_fontdata.TTFSearchPath = []
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -25,28 +30,20 @@ font_dir = os.path.join(basedir, 'fonts')
 if not os.path.exists(font_dir):
     os.makedirs(font_dir)
 
-# Sprawdzamy czy czcionki są już zarejestrowane
-registered_fonts = pdfmetrics.getRegisteredFontNames()
-
-# Rejestrujemy czcionki tylko jeśli nie są jeszcze zarejestrowane
-if 'DejaVuSans' not in registered_fonts:
-    pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(font_dir, 'DejaVuSans.ttf')))
-if 'DejaVuSans-Bold' not in registered_fonts:
-    pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
-
-# Globalne zmienne dla czcionek
-NORMAL_FONT = 'DejaVuSans'
-BOLD_FONT = 'DejaVuSans-Bold'
-
-# Dodajemy domyślne mapowanie czcionek
-if 'DejaVuSans' in registered_fonts and 'DejaVuSans-Bold' in registered_fonts:
-    registerFontFamily('DejaVuSans', normal='DejaVuSans', bold='DejaVuSans-Bold')
-
-# Upewniamy się, że czcionki są dostępne
+# Sprawdzamy czy pliki czcionek istnieją
 for font_file in ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']:
     font_path = os.path.join(font_dir, font_file)
     if not os.path.exists(font_path):
         raise FileNotFoundError(f"Brak wymaganego pliku czcionki: {font_path}")
+
+# Rejestrujemy czcionki
+pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(font_dir, 'DejaVuSans.ttf')))
+pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
+registerFontFamily('DejaVuSans', normal='DejaVuSans', bold='DejaVuSans-Bold')
+
+# Globalne zmienne dla czcionek
+NORMAL_FONT = 'DejaVuSans'
+BOLD_FONT = 'DejaVuSans-Bold'
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'twoj-tajny-klucz-tutaj'
@@ -264,31 +261,7 @@ def generate_pdf():
         print(f"Znaleziono {len(selected_products)} wybranych produktów")
         
         # Sprawdzamy dostępne czcionki przed utworzeniem canvas
-        print(f"Ścieżka do czcionek: {font_dir}")
-        print(f"Sprawdzam pliki czcionek:")
-        for font_file in ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']:
-            font_path = os.path.join(font_dir, font_file)
-            exists = os.path.exists(font_path)
-            print(f"- {font_file}: {'istnieje' if exists else 'nie istnieje'}")
-            if not exists:
-                raise FileNotFoundError(f"Brak wymaganego pliku czcionki: {font_path}")
-        
-        # Sprawdzamy czy czcionki są zarejestrowane
-        registered_fonts = pdfmetrics.getRegisteredFontNames()
-        print(f"Zarejestrowane czcionki: {registered_fonts}")
-        
-        # Upewniamy się, że czcionki są zarejestrowane
-        if NORMAL_FONT not in registered_fonts:
-            print(f"Rejestruję czcionkę {NORMAL_FONT}")
-            pdfmetrics.registerFont(TTFont(NORMAL_FONT, os.path.join(font_dir, 'DejaVuSans.ttf')))
-        if BOLD_FONT not in registered_fonts:
-            print(f"Rejestruję czcionkę {BOLD_FONT}")
-            pdfmetrics.registerFont(TTFont(BOLD_FONT, os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
-        
-        # Rejestrujemy rodzinę czcionek
-        if NORMAL_FONT in registered_fonts and BOLD_FONT in registered_fonts:
-            print("Rejestruję rodzinę czcionek")
-            registerFontFamily('DejaVuSans', normal=NORMAL_FONT, bold=BOLD_FONT)
+        print(f"Zarejestrowane czcionki: {pdfmetrics.getRegisteredFontNames()}")
         
         # Tworzenie PDF
         response = BytesIO()
@@ -297,7 +270,7 @@ def generate_pdf():
         print("Canvas utworzony pomyślnie")
         
         # Ustawiamy czcionkę i sprawdzamy czy się udało
-        print("Ustawiam czcionkę...")
+        print(f"Ustawiam czcionkę {BOLD_FONT}...")
         c.setFont(BOLD_FONT, 16)
         print("Czcionka ustawiona pomyślnie")
         
