@@ -6,6 +6,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import _fontdata_enc_winansi
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.pdfmetrics import registerFont, registerFontFamily
+from reportlab.lib.fonts import addMapping
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import io
@@ -15,20 +19,13 @@ from io import BytesIO
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Funkcja do konfiguracji czcionek
-def setup_fonts():
-    if platform.system() == 'Windows':
-        try:
-            pdfmetrics.registerFont(TTFont('CustomFont', 'C:\\Windows\\Fonts\\arial.ttf'))
-            pdfmetrics.registerFont(TTFont('CustomFont-Bold', 'C:\\Windows\\Fonts\\arialbd.ttf'))
-            return 'CustomFont', 'CustomFont-Bold'
-        except:
-            return 'Helvetica', 'Helvetica-Bold'
-    else:
-        return 'Helvetica', 'Helvetica-Bold'
+# Konfiguracja czcionek
+pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(basedir, 'fonts', 'DejaVuSans.ttf')))
+pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(basedir, 'fonts', 'DejaVuSans-Bold.ttf')))
 
 # Globalne zmienne dla czcionek
-NORMAL_FONT, BOLD_FONT = setup_fonts()
+NORMAL_FONT = 'DejaVuSans'
+BOLD_FONT = 'DejaVuSans-Bold'
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'twoj-tajny-klucz-tutaj'
