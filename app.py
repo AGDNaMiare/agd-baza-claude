@@ -6,6 +6,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import _fontdata
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import io
@@ -21,20 +22,27 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 # Rejestracja czcionek
 font_dir = os.path.join(basedir, 'fonts')
-pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(font_dir, 'DejaVuSans.ttf')))
-pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
+if not os.path.exists(font_dir):
+    os.makedirs(font_dir)
+
+# Sprawdzamy czy czcionki są już zarejestrowane
+registered_fonts = pdfmetrics.getRegisteredFontNames()
+
+# Rejestrujemy czcionki tylko jeśli nie są jeszcze zarejestrowane
+if 'DejaVuSans' not in registered_fonts:
+    pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(font_dir, 'DejaVuSans.ttf')))
+if 'DejaVuSans-Bold' not in registered_fonts:
+    pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
 
 # Globalne zmienne dla czcionek
 NORMAL_FONT = 'DejaVuSans'
 BOLD_FONT = 'DejaVuSans-Bold'
 
 # Dodajemy domyślne mapowanie czcionek
-registerFontFamily('DejaVuSans',normal='DejaVuSans',bold='DejaVuSans-Bold')
+if 'DejaVuSans' in registered_fonts and 'DejaVuSans-Bold' in registered_fonts:
+    registerFontFamily('DejaVuSans', normal='DejaVuSans', bold='DejaVuSans-Bold')
 
 # Upewniamy się, że czcionki są dostępne
-if not os.path.exists(font_dir):
-    os.makedirs(font_dir)
-
 for font_file in ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']:
     font_path = os.path.join(font_dir, font_file)
     if not os.path.exists(font_path):
@@ -265,11 +273,22 @@ def generate_pdf():
             if not exists:
                 raise FileNotFoundError(f"Brak wymaganego pliku czcionki: {font_path}")
         
+        # Sprawdzamy czy czcionki są zarejestrowane
+        registered_fonts = pdfmetrics.getRegisteredFontNames()
+        print(f"Zarejestrowane czcionki: {registered_fonts}")
+        
         # Upewniamy się, że czcionki są zarejestrowane
-        if NORMAL_FONT not in pdfmetrics.getRegisteredFontNames():
+        if NORMAL_FONT not in registered_fonts:
+            print(f"Rejestruję czcionkę {NORMAL_FONT}")
             pdfmetrics.registerFont(TTFont(NORMAL_FONT, os.path.join(font_dir, 'DejaVuSans.ttf')))
-        if BOLD_FONT not in pdfmetrics.getRegisteredFontNames():
+        if BOLD_FONT not in registered_fonts:
+            print(f"Rejestruję czcionkę {BOLD_FONT}")
             pdfmetrics.registerFont(TTFont(BOLD_FONT, os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
+        
+        # Rejestrujemy rodzinę czcionek
+        if NORMAL_FONT in registered_fonts and BOLD_FONT in registered_fonts:
+            print("Rejestruję rodzinę czcionek")
+            registerFontFamily('DejaVuSans', normal=NORMAL_FONT, bold=BOLD_FONT)
         
         # Tworzenie PDF
         response = BytesIO()
