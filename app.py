@@ -11,6 +11,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import io
 import os
 from io import BytesIO
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -22,6 +23,9 @@ pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(font_dir, 'DejaVu
 # Globalne zmienne dla czcionek
 NORMAL_FONT = 'DejaVuSans'
 BOLD_FONT = 'DejaVuSans-Bold'
+
+# Dodajemy domyślne mapowanie czcionek
+registerFontFamily('DejaVuSans',normal='DejaVuSans',bold='DejaVuSans-Bold')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'twoj-tajny-klucz-tutaj'
@@ -243,7 +247,16 @@ def generate_pdf():
         print(f"Sprawdzam pliki czcionek:")
         for font_file in ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']:
             font_path = os.path.join(font_dir, font_file)
-            print(f"- {font_file}: {'istnieje' if os.path.exists(font_path) else 'nie istnieje'}")
+            exists = os.path.exists(font_path)
+            print(f"- {font_file}: {'istnieje' if exists else 'nie istnieje'}")
+            if not exists:
+                raise FileNotFoundError(f"Brak wymaganego pliku czcionki: {font_path}")
+        
+        # Upewniamy się, że czcionki są zarejestrowane
+        if NORMAL_FONT not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(NORMAL_FONT, os.path.join(font_dir, 'DejaVuSans.ttf')))
+        if BOLD_FONT not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(BOLD_FONT, os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
         
         # Tworzenie PDF
         response = BytesIO()
