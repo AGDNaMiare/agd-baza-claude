@@ -6,15 +6,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase import _fontdata_enc_winansi
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-from reportlab.pdfbase.pdfmetrics import registerFont, registerFontFamily
-from reportlab.lib.fonts import addMapping
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import io
 import os
-import platform
 from io import BytesIO
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -245,17 +240,17 @@ def generate_pdf():
     c = canvas.Canvas(response, pagesize=A4)
     
     # Używamy czcionki DejaVuSans
-    c.setFont('DejaVuSans-Bold', 24)
+    c.setFont(BOLD_FONT, 24)
     c.drawString(30, 800, "Lista produktów")
+    y = 750  # Zmniejszamy początkową pozycję y
     
     # Ustawienia początkowe
-    y = 800
     margin = 50
     line_height = 20
     
     def write_text_block(text, x, y, font_size=10):
         """Funkcja pomocnicza do pisania tekstu z obsługą myślników"""
-        c.setFont('DejaVuSans', font_size)
+        c.setFont(NORMAL_FONT, font_size)
         if text:
             lines = text.split('\n')
             for line in lines:
@@ -276,19 +271,26 @@ def generate_pdf():
 
     # Produkty
     for product in selected_products:
+        # Sprawdzenie czy potrzebna jest nowa strona
+        if y < 100:
+            c.showPage()
+            c.setFont(BOLD_FONT, 24)
+            c.drawString(30, 800, "Lista produktów")
+            y = 750
+        
         # Nazwa produktu
-        c.setFont('DejaVuSans-Bold', 12)
+        c.setFont(BOLD_FONT, 12)
         c.drawString(margin, y, product.name)
         y -= line_height
         
         # Grupa produktu
-        c.setFont('DejaVuSans', 10)
+        c.setFont(NORMAL_FONT, 10)
         c.drawString(margin + 20, y, f"Grupa: {product.group.name}")
         y -= line_height
         
         # Opis produktu (jeśli istnieje)
         if product.description:
-            c.setFont('DejaVuSans', 10)
+            c.setFont(NORMAL_FONT, 10)
             c.drawString(margin + 20, y, "Opis produktu:")
             y -= line_height
             y = write_text_block(product.description, margin + 30, y)
@@ -296,7 +298,7 @@ def generate_pdf():
         # Informacje dla klienta (jeśli istnieją)
         if product.customer_info:
             y -= line_height/2
-            c.setFont('DejaVuSans', 10)
+            c.setFont(NORMAL_FONT, 10)
             c.drawString(margin + 20, y, "Informacje dla klienta:")
             y -= line_height
             y = write_text_block(product.customer_info, margin + 30, y)
@@ -304,7 +306,7 @@ def generate_pdf():
         # Sklepy i ceny
         if product.stores:
             y -= line_height/2
-            c.setFont('DejaVuSans', 10)
+            c.setFont(NORMAL_FONT, 10)
             c.drawString(margin + 20, y, "Dostępność w sklepach:")
             y -= line_height
             for store in product.stores:
@@ -314,15 +316,7 @@ def generate_pdf():
                 c.drawString(margin + 30, y, store_text)
                 y -= line_height
         
-        y -= line_height
-        
-        # Sprawdzenie czy potrzebna jest nowa strona
-        if y < 50:
-            c.showPage()
-            y = 800
-            c.setFont('DejaVuSans-Bold', 24)
-            c.drawString(30, y, "Lista produktów")
-            y -= line_height * 3
+        y -= line_height * 1.5  # Zwiększamy odstęp między produktami
     
     c.showPage()
     c.save()
