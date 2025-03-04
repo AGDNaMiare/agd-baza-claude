@@ -14,14 +14,22 @@ import os
 from io import BytesIO
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.rl_config import register_reset
+import reportlab.rl_config
 
 # Wyłączamy domyślne czcionki i ustawiamy własne
 register_reset()
+reportlab.rl_config.warnOnMissingFontGlyphs = 0
 _fontdata.STRIP_CONTROL = False
 _fontdata.EXTENSIONS = []
 _fontdata.DEFAULT_ENCODING = 'utf-8'
 _fontdata.T1SearchPath = []
 _fontdata.TTFSearchPath = []
+_fontdata.CMapSearchPath = []
+_fontdata.DefaultEncoding = 'utf-8'
+_fontdata.defaultEncoding = 'utf-8'
+_fontdata.standardFonts = []
+_fontdata.standardFontAttributes = {}
+_fontdata._fonts = {}
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -44,6 +52,17 @@ registerFontFamily('DejaVuSans', normal='DejaVuSans', bold='DejaVuSans-Bold')
 # Globalne zmienne dla czcionek
 NORMAL_FONT = 'DejaVuSans'
 BOLD_FONT = 'DejaVuSans-Bold'
+
+# Wyłączamy domyślne czcionki w ReportLab
+reportlab.rl_config.canvas_basefontname = NORMAL_FONT
+reportlab.rl_config.defaultGraphicsFontName = NORMAL_FONT
+reportlab.rl_config.ps2pdf_defaultFontName = NORMAL_FONT
+reportlab.rl_config.pageCompression = 1
+reportlab.rl_config.defaultPageSize = A4
+reportlab.rl_config.defaultImageCaching = 0
+reportlab.rl_config.T1SearchPath = []
+reportlab.rl_config.TTFSearchPath = [font_dir]
+reportlab.rl_config.CMapSearchPath = []
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'twoj-tajny-klucz-tutaj'
@@ -263,10 +282,14 @@ def generate_pdf():
         # Sprawdzamy dostępne czcionki przed utworzeniem canvas
         print(f"Zarejestrowane czcionki: {pdfmetrics.getRegisteredFontNames()}")
         
-        # Tworzenie PDF
+        # Tworzenie PDF z wymuszonymi ustawieniami
         response = BytesIO()
         print("Tworzę canvas...")
-        c = canvas.Canvas(response, pagesize=A4)
+        
+        # Tworzymy canvas z wymuszonymi ustawieniami
+        c = canvas.Canvas(response, pagesize=A4, initialFontName=NORMAL_FONT, initialFontSize=12)
+        c._fontname = NORMAL_FONT  # Wymuszamy użycie naszej czcionki
+        c._font = None  # Resetujemy cache czcionki
         print("Canvas utworzony pomyślnie")
         
         # Ustawiamy czcionkę i sprawdzamy czy się udało
@@ -296,6 +319,8 @@ def generate_pdf():
             if y < 100:
                 c.showPage()
                 y = 750
+                c._fontname = NORMAL_FONT  # Wymuszamy użycie naszej czcionki po każdej nowej stronie
+                c._font = None  # Resetujemy cache czcionki
                 c.setFont(BOLD_FONT, 16)
             
             # Nazwa grupy
@@ -311,6 +336,8 @@ def generate_pdf():
                 if y < 100:
                     c.showPage()
                     y = 750
+                    c._fontname = NORMAL_FONT  # Wymuszamy użycie naszej czcionki po każdej nowej stronie
+                    c._font = None  # Resetujemy cache czcionki
                     c.setFont(NORMAL_FONT, 12)
                 
                 c.drawString(70, y, f"{product.name} - {product.price:.2f} zł")
