@@ -19,9 +19,10 @@ from io import BytesIO
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Konfiguracja czcionek
-pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(basedir, 'fonts', 'DejaVuSans.ttf')))
-pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(basedir, 'fonts', 'DejaVuSans-Bold.ttf')))
+# Rejestracja czcionek
+font_dir = os.path.join(basedir, 'fonts')
+pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(font_dir, 'DejaVuSans.ttf')))
+pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
 
 # Globalne zmienne dla czcionek
 NORMAL_FONT = 'DejaVuSans'
@@ -243,65 +244,51 @@ def generate_pdf():
     response = BytesIO()
     c = canvas.Canvas(response, pagesize=A4)
     
+    # Używamy czcionki DejaVuSans
+    c.setFont('DejaVuSans-Bold', 24)
+    c.drawString(30, 800, "Lista produktów")
+    
     # Ustawienia początkowe
-    y = 800  # Zwiększamy początkową pozycję y
+    y = 800
     margin = 50
     line_height = 20
     
-    # Tytuł
-    c.setFont(BOLD_FONT, 24)
-    c.drawString(30, y, "Lista produktów")
-    y -= line_height * 3  # Zwiększamy odstęp po tytule
-    
     def write_text_block(text, x, y, font_size=10):
         """Funkcja pomocnicza do pisania tekstu z obsługą myślników"""
-        c.setFont(NORMAL_FONT, font_size)
+        c.setFont('DejaVuSans', font_size)
         if text:
             lines = text.split('\n')
             for line in lines:
-                line = line.strip()
-                if line.startswith('- '):
-                    # Tekst z myślnikiem
-                    words = line[2:].split()  # Pomijamy "- " na początku
-                    current_line = "•"  # Zamieniamy myślnik na bullet point
-                else:
-                    words = line.split()
-                    current_line = ""
-                
+                words = line.split()
+                current_line = ""
                 for word in words:
-                    # Sprawdzamy, czy dodanie słowa nie przekroczy szerokości strony
                     test_line = current_line + " " + word if current_line else word
-                    if len(test_line) * 5 < 500:  # Szacunkowa szerokość strony
+                    if len(test_line) * 5 < 500:  # przybliżona szerokość strony
                         current_line = test_line
                     else:
-                        # Jeśli linia zaczyna się od bullet pointa, dodajemy wcięcie
-                        indent = x + 15 if current_line.startswith('•') else x
-                        c.drawString(indent, y, current_line)
+                        c.drawString(x, y, current_line)
                         y -= line_height
                         current_line = word
-                
                 if current_line:
-                    # Jeśli linia zaczyna się od bullet pointa, dodajemy wcięcie
-                    indent = x + 15 if current_line.startswith('•') else x
-                    c.drawString(indent, y, current_line)
+                    c.drawString(x, y, current_line)
                     y -= line_height
         return y
-    
+
     # Produkty
     for product in selected_products:
         # Nazwa produktu
-        c.setFont(BOLD_FONT, 12)
+        c.setFont('DejaVuSans-Bold', 12)
         c.drawString(margin, y, product.name)
         y -= line_height
         
         # Grupa produktu
-        c.setFont(NORMAL_FONT, 10)
+        c.setFont('DejaVuSans', 10)
         c.drawString(margin + 20, y, f"Grupa: {product.group.name}")
         y -= line_height
         
         # Opis produktu (jeśli istnieje)
         if product.description:
-            c.setFont(NORMAL_FONT, 10)
+            c.setFont('DejaVuSans', 10)
             c.drawString(margin + 20, y, "Opis produktu:")
             y -= line_height
             y = write_text_block(product.description, margin + 30, y)
@@ -309,7 +296,7 @@ def generate_pdf():
         # Informacje dla klienta (jeśli istnieją)
         if product.customer_info:
             y -= line_height/2
-            c.setFont(NORMAL_FONT, 10)
+            c.setFont('DejaVuSans', 10)
             c.drawString(margin + 20, y, "Informacje dla klienta:")
             y -= line_height
             y = write_text_block(product.customer_info, margin + 30, y)
@@ -317,7 +304,7 @@ def generate_pdf():
         # Sklepy i ceny
         if product.stores:
             y -= line_height/2
-            c.setFont(NORMAL_FONT, 10)
+            c.setFont('DejaVuSans', 10)
             c.drawString(margin + 20, y, "Dostępność w sklepach:")
             y -= line_height
             for store in product.stores:
@@ -327,16 +314,15 @@ def generate_pdf():
                 c.drawString(margin + 30, y, store_text)
                 y -= line_height
         
-        # Odstęp między produktami
         y -= line_height
         
         # Sprawdzenie czy potrzebna jest nowa strona
         if y < 50:
             c.showPage()
-            y = 800  # Aktualizujemy też tutaj
-            c.setFont(BOLD_FONT, 24)
+            y = 800
+            c.setFont('DejaVuSans-Bold', 24)
             c.drawString(30, y, "Lista produktów")
-            y -= line_height * 3  # I tutaj również
+            y -= line_height * 3
     
     c.showPage()
     c.save()
