@@ -3,15 +3,32 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import io
 import os
+import platform
+from io import BytesIO
 
 basedir = os.path.abspath(os.path.dirname(__file__))
+
+# Funkcja do konfiguracji czcionek
+def setup_fonts():
+    if platform.system() == 'Windows':
+        try:
+            pdfmetrics.registerFont(TTFont('CustomFont', 'C:\\Windows\\Fonts\\arial.ttf'))
+            pdfmetrics.registerFont(TTFont('CustomFont-Bold', 'C:\\Windows\\Fonts\\arialbd.ttf'))
+            return 'CustomFont', 'CustomFont-Bold'
+        except:
+            return 'Helvetica', 'Helvetica-Bold'
+    else:
+        return 'Helvetica', 'Helvetica-Bold'
+
+# Globalne zmienne dla czcionek
+NORMAL_FONT, BOLD_FONT = setup_fonts()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'twoj-tajny-klucz-tutaj'
@@ -226,21 +243,22 @@ def generate_pdf():
     selected_products = Product.query.filter_by(selected=True).all()
     
     # Tworzenie PDF
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    
-    # Rejestracja czcionki Arial
-    pdfmetrics.registerFont(TTFont('Arial', 'C:\\Windows\\Fonts\\arial.ttf'))
-    pdfmetrics.registerFont(TTFont('Arial-Bold', 'C:\\Windows\\Fonts\\arialbd.ttf'))
+    response = BytesIO()
+    c = canvas.Canvas(response, pagesize=A4)
     
     # Ustawienia początkowe
-    y = 750
+    y = 800  # Zwiększamy początkową pozycję y
     margin = 50
     line_height = 20
     
+    # Tytuł
+    c.setFont(BOLD_FONT, 24)
+    c.drawString(30, y, "Lista produktów")
+    y -= line_height * 3  # Zwiększamy odstęp po tytule
+    
     def write_text_block(text, x, y, font_size=10):
         """Funkcja pomocnicza do pisania tekstu z obsługą myślników"""
-        p.setFont("Arial", font_size)
+        c.setFont(NORMAL_FONT, font_size)
         if text:
             lines = text.split('\n')
             for line in lines:
@@ -261,60 +279,55 @@ def generate_pdf():
                     else:
                         # Jeśli linia zaczyna się od bullet pointa, dodajemy wcięcie
                         indent = x + 15 if current_line.startswith('•') else x
-                        p.drawString(indent, y, current_line)
+                        c.drawString(indent, y, current_line)
                         y -= line_height
                         current_line = word
                 
                 if current_line:
                     # Jeśli linia zaczyna się od bullet pointa, dodajemy wcięcie
                     indent = x + 15 if current_line.startswith('•') else x
-                    p.drawString(indent, y, current_line)
+                    c.drawString(indent, y, current_line)
                     y -= line_height
         return y
-    
-    # Nagłówek
-    p.setFont("Arial-Bold", 16)
-    p.drawString(margin, y, "Lista wybranych produktów")
-    y -= line_height * 2
     
     # Produkty
     for product in selected_products:
         # Nazwa produktu
-        p.setFont("Arial-Bold", 12)
-        p.drawString(margin, y, product.name)
+        c.setFont(BOLD_FONT, 12)
+        c.drawString(margin, y, product.name)
         y -= line_height
         
         # Grupa produktu
-        p.setFont("Arial", 10)
-        p.drawString(margin + 20, y, f"Grupa: {product.group.name}")
+        c.setFont(NORMAL_FONT, 10)
+        c.drawString(margin + 20, y, f"Grupa: {product.group.name}")
         y -= line_height
         
         # Opis produktu (jeśli istnieje)
         if product.description:
-            p.setFont("Arial-Bold", 10)
-            p.drawString(margin + 20, y, "Opis produktu:")
+            c.setFont(NORMAL_FONT, 10)
+            c.drawString(margin + 20, y, "Opis produktu:")
             y -= line_height
             y = write_text_block(product.description, margin + 30, y)
         
         # Informacje dla klienta (jeśli istnieją)
         if product.customer_info:
             y -= line_height/2
-            p.setFont("Arial-Bold", 10)
-            p.drawString(margin + 20, y, "Informacje dla klienta:")
+            c.setFont(NORMAL_FONT, 10)
+            c.drawString(margin + 20, y, "Informacje dla klienta:")
             y -= line_height
             y = write_text_block(product.customer_info, margin + 30, y)
         
         # Sklepy i ceny
         if product.stores:
             y -= line_height/2
-            p.setFont("Arial-Bold", 10)
-            p.drawString(margin + 20, y, "Dostępność w sklepach:")
+            c.setFont(NORMAL_FONT, 10)
+            c.drawString(margin + 20, y, "Dostępność w sklepach:")
             y -= line_height
             for store in product.stores:
                 store_text = f"{store.name} - {product.price:.2f} zł"
                 if store.address:
                     store_text += f" (adres: {store.address})"
-                p.drawString(margin + 30, y, store_text)
+                c.drawString(margin + 30, y, store_text)
                 y -= line_height
         
         # Odstęp między produktami
@@ -322,18 +335,18 @@ def generate_pdf():
         
         # Sprawdzenie czy potrzebna jest nowa strona
         if y < 50:
-            p.showPage()
-            y = 750
-            p.setFont("Arial-Bold", 16)
-            p.drawString(margin, y, "Lista wybranych produktów (kontynuacja)")
-            y -= line_height * 2
+            c.showPage()
+            y = 800  # Aktualizujemy też tutaj
+            c.setFont(BOLD_FONT, 24)
+            c.drawString(30, y, "Lista produktów")
+            y -= line_height * 3  # I tutaj również
     
-    p.showPage()
-    p.save()
-    buffer.seek(0)
+    c.showPage()
+    c.save()
+    response.seek(0)
     
     return send_file(
-        buffer,
+        response,
         as_attachment=True,
         download_name='lista_produktow.pdf',
         mimetype='application/pdf'
