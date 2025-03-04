@@ -233,101 +233,106 @@ def toggle_product(product_id):
 @app.route('/generate_pdf')
 @login_required
 def generate_pdf():
-    selected_products = Product.query.filter_by(selected=True).all()
-    
-    # Tworzenie PDF
-    response = BytesIO()
-    c = canvas.Canvas(response, pagesize=A4)
-    
-    # Używamy czcionki DejaVuSans
-    c.setFont(BOLD_FONT, 24)
-    c.drawString(30, 800, "Lista produktów")
-    y = 750  # Zmniejszamy początkową pozycję y
-    
-    # Ustawienia początkowe
-    margin = 50
-    line_height = 20
-    
-    def write_text_block(text, x, y, font_size=10):
-        """Funkcja pomocnicza do pisania tekstu z obsługą myślników"""
-        c.setFont(NORMAL_FONT, font_size)
-        if text:
-            lines = text.split('\n')
-            for line in lines:
-                words = line.split()
-                current_line = ""
-                for word in words:
-                    test_line = current_line + " " + word if current_line else word
-                    if len(test_line) * 5 < 500:  # przybliżona szerokość strony
-                        current_line = test_line
-                    else:
-                        c.drawString(x, y, current_line)
-                        y -= line_height
-                        current_line = word
-                if current_line:
-                    c.drawString(x, y, current_line)
-                    y -= line_height
-        return y
-
-    # Produkty
-    for product in selected_products:
-        # Sprawdzenie czy potrzebna jest nowa strona
-        if y < 100:
-            c.showPage()
-            c.setFont(BOLD_FONT, 24)
-            c.drawString(30, 800, "Lista produktów")
-            y = 750
+    try:
+        print("Rozpoczynam generowanie PDF...")
+        selected_products = Product.query.filter_by(selected=True).all()
+        print(f"Znaleziono {len(selected_products)} wybranych produktów")
         
-        # Nazwa produktu
-        c.setFont(BOLD_FONT, 12)
-        c.drawString(margin, y, product.name)
-        y -= line_height
+        # Sprawdzamy dostępne czcionki przed utworzeniem canvas
+        print(f"Ścieżka do czcionek: {font_dir}")
+        print(f"Sprawdzam pliki czcionek:")
+        for font_file in ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']:
+            font_path = os.path.join(font_dir, font_file)
+            print(f"- {font_file}: {'istnieje' if os.path.exists(font_path) else 'nie istnieje'}")
         
-        # Grupa produktu
-        c.setFont(NORMAL_FONT, 10)
-        c.drawString(margin + 20, y, f"Grupa: {product.group.name}")
-        y -= line_height
+        # Tworzenie PDF
+        response = BytesIO()
+        print("Tworzę canvas...")
+        c = canvas.Canvas(response, pagesize=A4)
+        print("Canvas utworzony pomyślnie")
         
-        # Opis produktu (jeśli istnieje)
-        if product.description:
-            c.setFont(NORMAL_FONT, 10)
-            c.drawString(margin + 20, y, "Opis produktu:")
-            y -= line_height
-            y = write_text_block(product.description, margin + 30, y)
+        # Ustawiamy czcionkę i sprawdzamy czy się udało
+        print("Ustawiam czcionkę...")
+        c.setFont(BOLD_FONT, 16)
+        print("Czcionka ustawiona pomyślnie")
         
-        # Informacje dla klienta (jeśli istnieją)
-        if product.customer_info:
-            y -= line_height/2
-            c.setFont(NORMAL_FONT, 10)
-            c.drawString(margin + 20, y, "Informacje dla klienta:")
-            y -= line_height
-            y = write_text_block(product.customer_info, margin + 30, y)
+        # Rysujemy tytuł
+        c.drawString(50, 750, "Lista wybranych produktów")
+        print("Tytuł narysowany")
         
-        # Sklepy i ceny
-        if product.stores:
-            y -= line_height/2
-            c.setFont(NORMAL_FONT, 10)
-            c.drawString(margin + 20, y, "Dostępność w sklepach:")
-            y -= line_height
-            for store in product.stores:
-                store_text = f"{store.name} - {product.price:.2f} zł"
-                if store.address:
-                    store_text += f" (adres: {store.address})"
-                c.drawString(margin + 30, y, store_text)
-                y -= line_height
+        y = 700  # Początkowa pozycja Y
+        total_price = 0
         
-        y -= line_height * 1.5  # Zwiększamy odstęp między produktami
-    
-    c.showPage()
-    c.save()
-    response.seek(0)
-    
-    return send_file(
-        response,
-        as_attachment=True,
-        download_name='lista_produktow.pdf',
-        mimetype='application/pdf'
-    )
+        # Grupujemy produkty według grup
+        products_by_group = {}
+        for product in selected_products:
+            if product.group.name not in products_by_group:
+                products_by_group[product.group.name] = []
+            products_by_group[product.group.name].append(product)
+        
+        # Iterujemy po grupach
+        for group_name, products in products_by_group.items():
+            print(f"Przetwarzam grupę: {group_name}")
+            
+            # Sprawdzamy czy zostało wystarczająco miejsca na stronie
+            if y < 100:
+                c.showPage()
+                y = 750
+                c.setFont(BOLD_FONT, 16)
+            
+            # Nazwa grupy
+            c.setFont(BOLD_FONT, 14)
+            c.drawString(50, y, group_name)
+            y -= 30
+            
+            # Produkty w grupie
+            c.setFont(NORMAL_FONT, 12)
+            for product in products:
+                print(f"Przetwarzam produkt: {product.name}")
+                
+                if y < 100:
+                    c.showPage()
+                    y = 750
+                    c.setFont(NORMAL_FONT, 12)
+                
+                c.drawString(70, y, f"{product.name} - {product.price:.2f} zł")
+                y -= 20
+                
+                if product.description:
+                    c.drawString(90, y, f"Opis produktu: {product.description}")
+                    y -= 20
+                
+                if product.customer_info:
+                    c.drawString(90, y, f"Informacje dla klienta: {product.customer_info}")
+                    y -= 20
+                
+                total_price += product.price
+                y -= 10
+        
+        # Suma
+        c.setFont(BOLD_FONT, 14)
+        c.drawString(50, y, f"Suma: {total_price:.2f} zł")
+        
+        print("Finalizuję PDF...")
+        c.save()
+        response.seek(0)
+        print("PDF wygenerowany pomyślnie")
+        
+        return send_file(
+            response,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'produkty_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        )
+        
+    except Exception as e:
+        import traceback
+        print(f"Błąd podczas generowania PDF: {type(e).__name__}")
+        print(f"Szczegóły błędu: {str(e)}")
+        print("Traceback:")
+        print(traceback.format_exc())
+        flash('Wystąpił błąd podczas generowania PDF!', 'error')
+        return redirect(url_for('index'))
 
 @app.route('/edit_group/<int:group_id>', methods=['POST'])
 @login_required
