@@ -2,34 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase import _fontdata
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import io
 import os
 from io import BytesIO
-from reportlab.pdfbase.pdfmetrics import registerFontFamily
-from reportlab.rl_config import register_reset
-import reportlab.rl_config
-
-# Wyłączamy domyślne czcionki i ustawiamy własne
-register_reset()
-reportlab.rl_config.warnOnMissingFontGlyphs = 0
-_fontdata.STRIP_CONTROL = False
-_fontdata.EXTENSIONS = []
-_fontdata.DEFAULT_ENCODING = 'utf-8'
-_fontdata.T1SearchPath = []
-_fontdata.TTFSearchPath = []
-_fontdata.CMapSearchPath = []
-_fontdata.DefaultEncoding = 'utf-8'
-_fontdata.defaultEncoding = 'utf-8'
-_fontdata.standardFonts = []
-_fontdata.standardFontAttributes = {}
-_fontdata._fonts = {}
+from fpdf import FPDF
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -43,26 +21,6 @@ for font_file in ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']:
     font_path = os.path.join(font_dir, font_file)
     if not os.path.exists(font_path):
         raise FileNotFoundError(f"Brak wymaganego pliku czcionki: {font_path}")
-
-# Rejestrujemy czcionki
-pdfmetrics.registerFont(TTFont('DejaVuSans', os.path.join(font_dir, 'DejaVuSans.ttf')))
-pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', os.path.join(font_dir, 'DejaVuSans-Bold.ttf')))
-registerFontFamily('DejaVuSans', normal='DejaVuSans', bold='DejaVuSans-Bold')
-
-# Globalne zmienne dla czcionek
-NORMAL_FONT = 'DejaVuSans'
-BOLD_FONT = 'DejaVuSans-Bold'
-
-# Wyłączamy domyślne czcionki w ReportLab
-reportlab.rl_config.canvas_basefontname = NORMAL_FONT
-reportlab.rl_config.defaultGraphicsFontName = NORMAL_FONT
-reportlab.rl_config.ps2pdf_defaultFontName = NORMAL_FONT
-reportlab.rl_config.pageCompression = 1
-reportlab.rl_config.defaultPageSize = A4
-reportlab.rl_config.defaultImageCaching = 0
-reportlab.rl_config.T1SearchPath = []
-reportlab.rl_config.TTFSearchPath = [font_dir]
-reportlab.rl_config.CMapSearchPath = []
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'twoj-tajny-klucz-tutaj'
@@ -279,29 +237,36 @@ def generate_pdf():
         selected_products = Product.query.filter_by(selected=True).all()
         print(f"Znaleziono {len(selected_products)} wybranych produktów")
         
-        # Sprawdzamy dostępne czcionki przed utworzeniem canvas
-        print(f"Zarejestrowane czcionki: {pdfmetrics.getRegisteredFontNames()}")
+        # Upewniamy się, że czcionki są zarejestrowane
+        font_dir = os.path.join(basedir, 'fonts')
+        normal_font_path = os.path.join(font_dir, 'DejaVuSans.ttf')
+        bold_font_path = os.path.join(font_dir, 'DejaVuSans-Bold.ttf')
+        
+        if not os.path.exists(normal_font_path) or not os.path.exists(bold_font_path):
+            raise FileNotFoundError(f"Brak wymaganych plików czcionek w katalogu {font_dir}")
         
         # Tworzenie PDF z wymuszonymi ustawieniami
         response = BytesIO()
-        print("Tworzę canvas...")
+        print("Tworzę PDF...")
         
-        # Tworzymy canvas z wymuszonymi ustawieniami
-        c = canvas.Canvas(response, pagesize=A4, initialFontName=NORMAL_FONT, initialFontSize=12)
-        c._fontname = NORMAL_FONT  # Wymuszamy użycie naszej czcionki
-        c._font = None  # Resetujemy cache czcionki
-        print("Canvas utworzony pomyślnie")
+        # Tworzymy własną klasę PDF z obsługą czcionek
+        class PDF(FPDF):
+            def __init__(self):
+                super().__init__()
+                # Dodajemy czcionki
+                self.add_font('DejaVuSans', '', normal_font_path, uni=True)
+                self.add_font('DejaVuSans-Bold', '', bold_font_path, uni=True)
         
-        # Ustawiamy czcionkę i sprawdzamy czy się udało
-        print(f"Ustawiam czcionkę {BOLD_FONT}...")
-        c.setFont(BOLD_FONT, 16)
-        print("Czcionka ustawiona pomyślnie")
+        pdf = PDF()
+        pdf.add_page()
+        
+        # Ustawiamy czcionkę
+        pdf.set_font('DejaVuSans-Bold', size=16)
         
         # Rysujemy tytuł
-        c.drawString(50, 750, "Lista wybranych produktów")
-        print("Tytuł narysowany")
+        pdf.cell(0, 10, "Lista wybranych produktów", 0, 1, 'C')
         
-        y = 700  # Początkowa pozycja Y
+        y = 10
         total_price = 0
         
         # Grupujemy produkty według grup
@@ -313,55 +278,45 @@ def generate_pdf():
         
         # Iterujemy po grupach
         for group_name, products in products_by_group.items():
-            print(f"Przetwarzam grupę: {group_name}")
-            
             # Sprawdzamy czy zostało wystarczająco miejsca na stronie
-            if y < 100:
-                c.showPage()
-                y = 750
-                c._fontname = NORMAL_FONT  # Wymuszamy użycie naszej czcionki po każdej nowej stronie
-                c._font = None  # Resetujemy cache czcionki
-                c.setFont(BOLD_FONT, 16)
+            if y > 270:
+                pdf.add_page()
+                y = 10
+                pdf.set_font('DejaVuSans-Bold', size=16)
             
             # Nazwa grupy
-            c.setFont(BOLD_FONT, 14)
-            c.drawString(50, y, group_name)
-            y -= 30
+            pdf.set_font('DejaVuSans-Bold', size=14)
+            pdf.cell(0, 10, group_name, 0, 1, 'L')
+            y += 10
             
             # Produkty w grupie
-            c.setFont(NORMAL_FONT, 12)
+            pdf.set_font('DejaVuSans', size=12)
             for product in products:
-                print(f"Przetwarzam produkt: {product.name}")
+                if y > 270:
+                    pdf.add_page()
+                    y = 10
+                    pdf.set_font('DejaVuSans', size=12)
                 
-                if y < 100:
-                    c.showPage()
-                    y = 750
-                    c._fontname = NORMAL_FONT  # Wymuszamy użycie naszej czcionki po każdej nowej stronie
-                    c._font = None  # Resetujemy cache czcionki
-                    c.setFont(NORMAL_FONT, 12)
-                
-                c.drawString(70, y, f"{product.name} - {product.price:.2f} zł")
-                y -= 20
+                pdf.cell(0, 10, f"{product.name} - {product.price:.2f} zł", 0, 1, 'L')
+                y += 10
                 
                 if product.description:
-                    c.drawString(90, y, f"Opis produktu: {product.description}")
-                    y -= 20
+                    pdf.cell(0, 10, f"Opis produktu: {product.description}", 0, 1, 'L')
+                    y += 10
                 
                 if product.customer_info:
-                    c.drawString(90, y, f"Informacje dla klienta: {product.customer_info}")
-                    y -= 20
+                    pdf.cell(0, 10, f"Informacje dla klienta: {product.customer_info}", 0, 1, 'L')
+                    y += 10
                 
                 total_price += product.price
-                y -= 10
+                y += 10
         
         # Suma
-        c.setFont(BOLD_FONT, 14)
-        c.drawString(50, y, f"Suma: {total_price:.2f} zł")
+        pdf.set_font('DejaVuSans-Bold', size=14)
+        pdf.cell(0, 10, f"Suma: {total_price:.2f} zł", 0, 1, 'R')
         
-        print("Finalizuję PDF...")
-        c.save()
+        pdf.output(response)
         response.seek(0)
-        print("PDF wygenerowany pomyślnie")
         
         return send_file(
             response,
