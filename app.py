@@ -12,6 +12,10 @@ import io
 import os
 from io import BytesIO
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
+from reportlab.rl_config import register_reset
+
+# Wyłączamy domyślne czcionki
+register_reset()
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -26,6 +30,15 @@ BOLD_FONT = 'DejaVuSans-Bold'
 
 # Dodajemy domyślne mapowanie czcionek
 registerFontFamily('DejaVuSans',normal='DejaVuSans',bold='DejaVuSans-Bold')
+
+# Upewniamy się, że czcionki są dostępne
+if not os.path.exists(font_dir):
+    os.makedirs(font_dir)
+
+for font_file in ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']:
+    font_path = os.path.join(font_dir, font_file)
+    if not os.path.exists(font_path):
+        raise FileNotFoundError(f"Brak wymaganego pliku czcionki: {font_path}")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'twoj-tajny-klucz-tutaj'
