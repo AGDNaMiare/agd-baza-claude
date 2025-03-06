@@ -1,0 +1,17 @@
+[33me3305e9[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m poprawki w logowaniu
+[33m5c09f82[m Przebudowa aplikacji - nowa wersja z obsug cen dla poszczególnych sklepów
+[33m549bb39[m poprawki generatora
+[33me991001[m das
+[33md6d8608[m Update app.py
+[33m020b71f[m Update app.py
+[33m083706d[m Update app.py
+[33m237cc81[m Update app.py
+[33m2e6eb01[m Update app.py
+[33m2fbc2cd[m Update app.py
+[33m3e37f6f[m Poprawiono generowanie PDF z użyciem czcionek DejaVu Sans
+[33m040025e[m czcionki cd
+[33m91e2959[m Dodano czcionki DejaVu Sans
+[33m99e9c50[m poprawki czcionki
+[33m5593dc4[m poprawki w pdf
+[33m5e82848[m Update database.db
+[33mf0e5ad3[m Pierwsze zatwierdzenie
