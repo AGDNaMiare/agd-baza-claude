@@ -24,9 +24,22 @@ for font_file in ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']:
         raise FileNotFoundError(f"Brak wymaganego pliku czcionki: {font_path}")
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'twoj-tajny-klucz-tutaj'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'twoj-tajny-klucz-tutaj')
+
+# Konfiguracja bazy danych
+if os.environ.get('DATABASE_URL'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL').replace('postgres://', 'postgresql://')
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Konfiguracja dla produkcji
+if os.environ.get('FLASK_ENV') == 'production':
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['REMEMBER_COOKIE_SECURE'] = True
+    app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
